@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>O-RAN O2 Interface Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            background: #e5e7eb;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .tab:hover {
+            transform: translateY(-2px);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .card.full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .info-label {
+            color: #666;
+        }
+        
+        .info-value {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        
+        .badge.healthy {
+            background: #10b981;
+            color: white;
+        }
+        
+        .badge.running {
+            background: #10b981;
+            color: white;
+        }
+        
+        .badge.stopped {
+            background: #6b7280;
+            color: white;
+        }
+        
+        .list-item {
+            background: #f9fafb;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .progress-bar {
+            background: #e5e7eb;
+            height: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        
+        .progress-fill.low {
+            background: #10b981;
+        }
+        
+        .progress-fill.medium {
+            background: #f59e0b;
+        }
+        
+        .progress-fill.high {
+            background: #ef4444;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+        }
+        
+        .api-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            margin-left: 10px;
+            background: #8b5cf6;
+            color: white;
+            border-radius: 4px;
+            font-size: 0.75em;
+        }
+        
+        .last-update {
+            text-align: center;
+            color: white;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌩️ O-RAN O2 Interface Dashboard</h1>
+            <div>
+                <span id="status" class="badge">Loading...</span>
+                <span id="ocloud-info" style="margin-left: 20px; color: #666;"></span>
+            </div>
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('overview')">Overview</button>
+                <button class="tab" onclick="switchTab('ims')">O2 IMS</button>
+                <button class="tab" onclick="switchTab('dms')">O2 DMS</button>
+                <button class="tab" onclick="switchTab('resources')">Resources</button>
+            </div>
+        </div>
+        
+        <!-- Overview Tab -->
+        <div id="overview-tab" class="tab-content active">
+            <div class="grid">
+                <div class="card">
+                    <h2>O-Cloud Status</h2>
+                    <div id="ocloud-status"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>API Endpoints</h2>
+                    <div id="api-endpoints"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>Quick Stats</h2>
+                    <div id="quick-stats"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- IMS Tab -->
+        <div id="ims-tab" class="tab-content">
+            <div class="grid">
+                <div class="card">
+                    <h2>Resource Pools <span class="api-badge">IMS v1.2.0</span></h2>
+                    <div id="ims-pools"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>Resource Types <span class="api-badge">IMS v1.2.0</span></h2>
+                    <div id="ims-types"></div>
+                </div>
+                
+                <div class="card full-width">
+                    <h2>Alarms <span class="api-badge">Monitoring v1.2.0</span></h2>
+                    <div id="ims-alarms"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- DMS Tab -->
+        <div id="dms-tab" class="tab-content">
+            <div class="grid">
+                <div class="card full-width">
+                    <h2>VNF Instances (NF Deployments) <span class="api-badge">DMS v2.14.0</span></h2>
+                    <div id="dms-instances"></div>
+                </div>
+                
+                <div class="card full-width">
+                    <h2>Deployment Managers <span class="api-badge">IMS v1.2.0</span></h2>
+                    <div id="dms-managers"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Resources Tab -->
+        <div id="resources-tab" class="tab-content">
+            <div class="grid">
+                <div class="card">
+                    <h2>🖥️ CPU Resources</h2>
+                    <div id="cpu-info"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>💾 Memory</h2>
+                    <div id="memory-info"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>💿 Storage</h2>
+                    <div id="storage-info"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="last-update">
+            Last updated: <span id="last-update">Never</span> | 
+            Auto-refresh every 5 seconds
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+        let currentTab = 'overview';
+        
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+            currentTab = tabName;
+            
+            // Fetch data for the tab
+            fetchData();
+        }
+        
+        function getProgressClass(percent) {
+            if (percent < 50) return 'low';
+            if (percent < 80) return 'medium';
+            return 'high';
+        }
+        
+        async function fetchData() {
+            try {
+                const [rootRes, healthRes] = await Promise.all([
+                    fetch(`${API_BASE}/`),
+                    fetch(`${API_BASE}/health`)
+                ]);
+                
+                const rootData = await rootRes.json();
+                const healthData = await healthRes.json();
+                
+                // Update header
+                document.getElementById('status').className = 'badge healthy';
+                document.getElementById('status').textContent = healthData.status.toUpperCase();
+                document.getElementById('ocloud-info').textContent = 
+                    `${rootData.oCloudId} - ${rootData.name}`;
+                
+                // Update based on current tab
+                if (currentTab === 'overview') {
+                    updateOverview(rootData, healthData);
+                } else if (currentTab === 'ims') {
+                    updateIMS();
+                } else if (currentTab === 'dms') {
+                    updateDMS();
+                } else if (currentTab === 'resources') {
+                    updateResources();
+                }
+                
+                document.getElementById('last-update').textContent = 
+                    new Date().toLocaleTimeString();
+                    
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                document.getElementById('status').className = 'badge stopped';
+                document.getElementById('status').textContent = 'ERROR';
+            }
+        }
+        
+        async function updateOverview(rootData, healthData) {
+            // O-Cloud Status
+            let statusHTML = `
+                <div class="info-item">
+                    <span class="info-label">O-Cloud ID:</span>
+                    <span class="info-value">${rootData.oCloudId}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Global Cloud ID:</span>
+                    <span class="info-value">${rootData.globalCloudId}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Name:</span>
+                    <span class="info-value">${rootData.name}</span>
+                </div>
+            `;
+            document.getElementById('ocloud-status').innerHTML = statusHTML;
+            
+            // API Endpoints
+            let apiHTML = '<h3>O2 IMS</h3>';
+            Object.entries(rootData.apis['O2 IMS']).forEach(([name, api]) => {
+                apiHTML += `
+                    <div class="info-item">
+                        <span class="info-label">${name}:</span>
+                        <span class="info-value">v${api.version}</span>
+                    </div>
+                `;
+            });
+            apiHTML += '<h3 style="margin-top: 15px;">O2 DMS</h3>';
+            Object.entries(rootData.apis['O2 DMS']).forEach(([name, api]) => {
+                apiHTML += `
+                    <div class="info-item">
+                        <span class="info-label">${name}:</span>
+                        <span class="info-value">v${api.version}</span>
+                    </div>
+                `;
+            });
+            document.getElementById('api-endpoints').innerHTML = apiHTML;
+            
+            // Quick Stats
+            const vnfRes = await fetch(`${API_BASE}/vnflcm/v2/vnf_instances`);
+            const vnfData = await vnfRes.json();
+            
+            let statsHTML = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <div class="metric-value">${vnfData.length}</div>
+                    <div style="color: #666;">VNF Instances</div>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">IMS Status:</span>
+                    <span class="info-value">${healthData.services.ims}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">DMS Status:</span>
+                    <span class="info-value">${healthData.services.dms}</span>
+                </div>
+            `;
+            document.getElementById('quick-stats').innerHTML = statsHTML;
+        }
+        
+        async function updateIMS() {
+            // Resource Pools
+            const poolsRes = await fetch(`${API_BASE}/O2ims_infrastructureInventory/v1/resourcePools`);
+            const pools = await poolsRes.json();
+            
+            let poolsHTML = '';
+            pools.forEach(pool => {
+                poolsHTML += `
+                    <div class="list-item">
+                        <strong>${pool.name}</strong>
+                        <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                            ID: ${pool.resourcePoolId}<br>
+                            Location: ${pool.location}
+                        </div>
+                    </div>
+                `;
+            });
+           
+           document.getElementById('ims-pools').innerHTML = poolsHTML || '<div class="loading">No pools found</div>';
+            
+            // Resource Types
+            const typesRes = await fetch(`${API_BASE}/O2ims_infrastructureInventory/v1/resourceTypes`);
+            const types = await typesRes.json();
+            
+            let typesHTML = '';
+            types.forEach(type => {
+                typesHTML += `
+                    <div class="list-item">
+                        <strong>${type.name}</strong>
+                        <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                            ${type.description}<br>
+                            Version: ${type.version}
+                        </div>
+                    </div>
+                `;
+            });
+            document.getElementById('ims-types').innerHTML = typesHTML || '<div class="loading">No types found</div>';
+            
+            // Alarms
+            const alarmsRes = await fetch(`${API_BASE}/O2ims_infrastructureMonitoring/v1/alarms`);
+            const alarms = await alarmsRes.json();
+            
+            let alarmsHTML = '';
+            if (alarms.length === 0) {
+                alarmsHTML = '<div class="loading">No active alarms</div>';
+            } else {
+                alarms.forEach(alarm => {
+                    const severity = ['CLEARED', 'INDETERMINATE', 'WARNING', 'MINOR', 'MAJOR', 'CRITICAL'][alarm.perceivedSeverity] || 'UNKNOWN';
+                    alarmsHTML += `
+                        <div class="list-item">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong>Alarm ${alarm.alarmEventRecordId}</strong>
+                                    <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                                        Resource: ${alarm.resourceId}<br>
+                                        Raised: ${alarm.alarmRaisedTime}
+                                    </div>
+                                </div>
+                                <span class="badge" style="background: ${alarm.perceivedSeverity === 3 ? '#ef4444' : '#f59e0b'}">
+                                    ${severity}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            document.getElementById('ims-alarms').innerHTML = alarmsHTML;
+        }
+        
+        async function updateDMS() {
+            // VNF Instances
+            const vnfRes = await fetch(`${API_BASE}/vnflcm/v2/vnf_instances`);
+            const vnfInstances = await vnfRes.json();
+            
+            let vnfHTML = '';
+            if (vnfInstances.length === 0) {
+                vnfHTML = '<div class="loading">No VNF instances deployed</div>';
+            } else {
+                vnfInstances.forEach(vnf => {
+                    const state = vnf.instantiationState;
+                    const badgeClass = state === 'INSTANTIATED' ? 'running' : 'stopped';
+                    vnfHTML += `
+                        <div class="list-item">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong>${vnf.vnfInstanceName || vnf.id}</strong>
+                                    <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                                        ID: ${vnf.id}<br>
+                                        VNFD: ${vnf.vnfdId}
+                                    </div>
+                                </div>
+                                <span class="badge ${badgeClass}">${state}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            document.getElementById('dms-instances').innerHTML = vnfHTML;
+            
+            // Deployment Managers
+            const dmRes = await fetch(`${API_BASE}/O2ims_infrastructureInventory/v1/deploymentManagers`);
+            const dms = await dmRes.json();
+            
+            let dmHTML = '';
+            dms.forEach(dm => {
+                dmHTML += `
+                    <div class="list-item">
+                        <strong>${dm.name}</strong>
+                        <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                            ${dm.description}<br>
+                            Service URI: ${dm.serviceUri}<br>
+                            Locations: ${dm.supportedLocations.join(', ')}
+                        </div>
+                    </div>
+                `;
+            });
+            document.getElementById('dms-managers').innerHTML = dmHTML || '<div class="loading">No deployment managers</div>';
+        }
+        
+        async function updateResources() {
+            // Get system resources
+            const statusRes = await fetch(`${API_BASE}/health`);
+            const healthData = await statusRes.json();
+            
+            // For detailed resources, we'll call the IMS inventory
+            const poolRes = await fetch(`${API_BASE}/O2ims_infrastructureInventory/v1/resourcePools/pool-001`);
+            const poolData = await poolRes.json();
+            const resources = poolData.resources;
+            
+            // CPU
+            document.getElementById('cpu-info').innerHTML = `
+                <div style="margin-bottom: 15px;">
+                    <div style="font-size: 0.9em; color: #666;">Total Cores</div>
+                    <div style="font-size: 1.5em; font-weight: bold;">${resources.cpu.total_cores}</div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <div style="font-size: 0.9em; color: #666;">Available Cores</div>
+                    <div style="font-size: 1.5em; font-weight: bold;">${resources.cpu.available_cores.toFixed(2)}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">Usage</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill ${getProgressClass(resources.cpu.used_percent)}" 
+                             style="width: ${resources.cpu.used_percent}%">
+                            ${resources.cpu.used_percent.toFixed(1)}%
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Memory
+            document.getElementById('memory-info').innerHTML = `
+                <div style="margin-bottom: 15px;">
+                    <div style="font-size: 0.9em; color: #666;">Total</div>
+                    <div style="font-size: 1.5em; font-weight: bold;">${resources.memory.total_mb} MB</div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <div style="font-size: 0.9em; color: #666;">Available</div>
+                    <div style="font-size: 1.5em; font-weight: bold;">${resources.memory.available_mb} MB</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">Usage</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill ${getProgressClass(resources.memory.percent_used)}" 
+                             style="width: ${resources.memory.percent_used}%">
+                            ${resources.memory.percent_used.toFixed(1)}%
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Storage
+            document.getElementById('storage-info').innerHTML = `
+                <div style="margin-bottom: 15px;">
+                    <div style="font-size: 0.9em; color: #666;">Total</div>
+                    <div style="font-size: 1.5em; font-weight: bold;">${resources.storage.total_gb} GB</div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <div style="font-size: 0.9em; color: #666;">Available</div>
+                    <div style="font-size: 1.5em; font-weight: bold;">${resources.storage.available_gb} GB</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">Usage</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill ${getProgressClass(resources.storage.percent_used)}" 
+                             style="width: ${resources.storage.percent_used}%">
+                            ${resources.storage.percent_used.toFixed(1)}%
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Initial fetch
+        fetchData();
+        
+        // Auto-refresh every 5 seconds
+        setInterval(fetchData, 5000);
+    </script>
+</body>
+</html>
