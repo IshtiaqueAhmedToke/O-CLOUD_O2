@@ -9,7 +9,7 @@ import json
 from datetime import datetime
 from contextlib import contextmanager
 
-DATABASE_PATH = '/home/toke/o-cloud/ocloud.db'
+DATABASE_PATH = '/home/toke/O-CLOUD_O2/ocloud.db'
 
 class DatabaseManager:
     """Manages SQLite database operations for O-CLOUD"""
@@ -171,13 +171,14 @@ class DatabaseManager:
     # SUBSCRIPTION OPERATIONS
     # =========================================================================
     
-    def create_subscription(self, subscription_id, callback_uri, filter_data=None):
-        """Create a subscription"""
+    def create_subscription(self, subscription_id, subscription_type, callback_uri, filter_data=None):
+        """Create a subscription (updated with type)"""
         with self.get_connection() as conn:
             conn.execute('''
-                INSERT INTO subscriptions (subscription_id, callback_uri, filter)
-                VALUES (?, ?, ?)
-            ''', (subscription_id, callback_uri, json.dumps(filter_data) if filter_data else None))
+                INSERT INTO subscriptions (subscription_id, subscription_type, callback_uri, filter)
+                VALUES (?, ?, ?, ?)
+            ''', (subscription_id, subscription_type, callback_uri, 
+                  json.dumps(filter_data) if filter_data else None))
     
     def get_subscription(self, subscription_id):
         """Get a specific subscription"""
@@ -204,10 +205,206 @@ class DatabaseManager:
                     sub['filter'] = json.loads(sub['filter'])
             return subs
     
+    def get_subscriptions_by_type(self, subscription_type):
+        """Get subscriptions by type"""
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                'SELECT * FROM subscriptions WHERE subscription_type = ?',
+                (subscription_type,)
+            )
+            subs = [dict(row) for row in cursor.fetchall()]
+            for sub in subs:
+                if sub['filter']:
+                    sub['filter'] = json.loads(sub['filter'])
+            return subs
+    
     def delete_subscription(self, subscription_id):
         """Delete a subscription"""
         with self.get_connection() as conn:
             conn.execute('DELETE FROM subscriptions WHERE subscription_id = ?', (subscription_id,))
+    
+    # =========================================================================
+    # DMS ALARM OPERATIONS
+    # =========================================================================
+    
+    def create_dms_alarm(self, alarm_id, deployment_id, severity, event_type, probable_cause):
+        """Create a DMS alarm"""
+        with self.get_connection() as conn:
+            conn.execute('''
+                INSERT INTO dms_alarms 
+                (alarm_id, deployment_id, alarm_raised_time, perceived_severity, 
+                 event_type, probable_cause)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (alarm_id, deployment_id, datetime.now().isoformat(), 
+                  severity, event_type, probable_cause))
+    
+    def get_dms_alarms(self, deployment_id=None):
+        """Get all DMS alarms, optionally filtered by deployment"""
+        with self.get_connection() as conn:
+            if deployment_id:
+                cursor = conn.execute(
+                    'SELECT * FROM dms_alarms WHERE deployment_id = ? ORDER BY alarm_raised_time DESC',
+                    (deployment_id,)
+                )
+            else:
+                cursor = conn.execute('SELECT * FROM dms_alarms ORDER BY alarm_raised_time DESC')
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def get_dms_alarm(self, alarm_id):
+        """Get specific DMS alarm"""
+        with self.get_connection() as conn:
+            cursor = conn.execute('SELECT * FROM dms_alarms WHERE alarm_id = ?', (alarm_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    
+    def acknowledge_dms_alarm(self, alarm_id):
+        """Acknowledge a DMS alarm"""
+        with self.get_connection() as conn:
+            conn.execute('''
+                UPDATE dms_alarms 
+                SET alarm_acknowledged = 1, alarm_acknowledged_time = ?
+                WHERE alarm_id = ?
+            ''', (datetime.now().isoformat(), alarm_id))
+    
+    def clear_dms_alarm(self, alarm_id):
+        """Clear a DMS alarm"""
+        with self.get_connection() as conn:
+            conn.execute('''
+                UPDATE dms_alarms 
+                SET alarm_cleared_time = ?, perceived_severity = 'CLEARED'
+                WHERE alarm_id = ?
+            ''', (datetime.now().isoformat(), alarm_id))
+    
+    # =========================================================================
+    # PERFORMANCE MONITORING OPERATIONS
+    # =========================================================================
+    
+    def create_pm_job(self, job_id, job_type, object_type, object_instance_ids, 
+                      callback_uri=None, collection_interval=60):
+        """Create a performance monitoring job"""
+        with self.get_connection() as conn:
+            conn.execute('''
+                INSERT INTO pm_jobs 
+                (job_id, job_type, object_type, object_instance_ids, 
+                 callback_uri, collection_interval)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (job_id, job_type, object_type, 
+                  json.dumps(object_instance_ids), callback_uri, collection_interval))
+    
+    def get_pm_jobs(self, job_type=None):
+        """Get all PM jobs, optionally filtered by type"""
+        with self.get_connection() as conn:
+            if job_type:
+                cursor = conn.execute(
+                    'SELECT * FROM pm_jobs WHERE job_type = ? ORDER BY created_at DESC',
+                    (job_type,)
+                )
+            else:
+                cursor = conn.execute('SELECT * FROM pm_jobs ORDER BY created_at DESC')
+            
+            jobs = []
+            for row in cursor.fetchall():
+                job = dict(row)
+                if job['object_instance_ids']:
+                    job['object_instance_ids'] = json.loads(job['object_instance_ids'])
+                jobs.append(job)
+            return jobs
+    
+    def get_pm_job(self, job_id):
+        """Get specific PM job"""
+        with self.get_connection() as conn:
+            cursor = conn.execute('SELECT * FROM pm_jobs WHERE job_id = ?', (job_id,))
+            row = cursor.fetchone()
+            if row:
+                job = dict(row)
+                if job['object_instance_ids']:
+                    job['object_instance_ids'] = json.loads(job['object_instance_ids'])
+                return job
+            return None
+    
+    def delete_pm_job(self, job_id):
+        """Delete a PM job"""
+        with self.get_connection() as conn:
+            conn.execute('DELETE FROM pm_jobs WHERE job_id = ?', (job_id,))
+            conn.execute('DELETE FROM pm_reports WHERE job_id = ?', (job_id,))
+    
+    def create_pm_report(self, report_id, job_id, entries):
+        """Create a performance report"""
+        with self.get_connection() as conn:
+            conn.execute('''
+                INSERT INTO pm_reports (report_id, job_id, entries)
+                VALUES (?, ?, ?)
+            ''', (report_id, job_id, json.dumps(entries)))
+    
+    def get_pm_reports(self, job_id):
+        """Get all reports for a PM job"""
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                'SELECT * FROM pm_reports WHERE job_id = ? ORDER BY created_at DESC',
+                (job_id,)
+            )
+            reports = []
+            for row in cursor.fetchall():
+                report = dict(row)
+                if report['entries']:
+                    report['entries'] = json.loads(report['entries'])
+                reports.append(report)
+            return reports
+    
+    def get_pm_report(self, report_id):
+        """Get specific PM report"""
+        with self.get_connection() as conn:
+            cursor = conn.execute('SELECT * FROM pm_reports WHERE report_id = ?', (report_id,))
+            row = cursor.fetchone()
+            if row:
+                report = dict(row)
+                if report['entries']:
+                    report['entries'] = json.loads(report['entries'])
+                return report
+            return None
+    
+    def create_pm_threshold(self, threshold_id, object_type, object_instance_id, 
+                           criteria, callback_uri=None):
+        """Create a performance threshold"""
+        with self.get_connection() as conn:
+            conn.execute('''
+                INSERT INTO pm_thresholds 
+                (threshold_id, object_type, object_instance_id, criteria, callback_uri)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (threshold_id, object_type, object_instance_id, 
+                  json.dumps(criteria), callback_uri))
+    
+    def get_pm_thresholds(self):
+        """Get all PM thresholds"""
+        with self.get_connection() as conn:
+            cursor = conn.execute('SELECT * FROM pm_thresholds ORDER BY created_at DESC')
+            thresholds = []
+            for row in cursor.fetchall():
+                threshold = dict(row)
+                if threshold['criteria']:
+                    threshold['criteria'] = json.loads(threshold['criteria'])
+                thresholds.append(threshold)
+            return thresholds
+    
+    def get_pm_threshold(self, threshold_id):
+        """Get specific PM threshold"""
+        with self.get_connection() as conn:
+            cursor = conn.execute(
+                'SELECT * FROM pm_thresholds WHERE threshold_id = ?',
+                (threshold_id,)
+            )
+            row = cursor.fetchone()
+            if row:
+                threshold = dict(row)
+                if threshold['criteria']:
+                    threshold['criteria'] = json.loads(threshold['criteria'])
+                return threshold
+            return None
+    
+    def delete_pm_threshold(self, threshold_id):
+        """Delete a PM threshold"""
+        with self.get_connection() as conn:
+            conn.execute('DELETE FROM pm_thresholds WHERE threshold_id = ?', (threshold_id,))
 
 
 # Singleton instance
