@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>O-RAN RIC Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Roboto+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0d1117 0%, #1a1f2e 50%, #0d1117 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #fff;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        #particles-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            animation: fadeInDown 0.6s ease-out;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 20px rgba(0,0,0,0.3);
+            letter-spacing: -1px;
+            background: linear-gradient(135deg, #fff 0%, #a0c4ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.95;
+            font-weight: 300;
+            letter-spacing: 0.5px;
+        }
+
+        /* Tab Navigation */
+        .tab-navigation {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 0;
+        }
+
+        .tab-button {
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            padding: 15px 30px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+            position: relative;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .tab-button:hover {
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-button.active {
+            color: #fff;
+            border-bottom-color: #a0c4ff;
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 0 0 1px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            animation: fadeInUp 0.6s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glass-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(255, 255, 255, 0.3) 50%, 
+                transparent 100%);
+        }
+
+        .glass-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, 
+                transparent, 
+                rgba(255, 255, 255, 0.08), 
+                transparent);
+            transition: left 0.6s ease;
+        }
+
+        .glass-card:hover::after {
+            left: 100%;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 
+                0 16px 48px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                0 0 0 1px rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .card-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 15px;
+            opacity: 0.9;
+            color: #fff;
+            position: relative;
+            z-index: 1;
+        }
+
+        .card-value {
+            font-size: 3rem;
+            font-weight: 700;
+            font-family: 'Roboto Mono', monospace;
+            margin: 15px 0;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+            color: #fff;
+            position: relative;
+            z-index: 1;
+        }
+
+        .card-unit {
+            font-size: 1rem;
+            opacity: 0.85;
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.9);
+            position: relative;
+            z-index: 1;
+        }
+
+        .card-status {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-top: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: relative;
+            z-index: 1;
+            backdrop-filter: blur(10px);
+        }
+
+        .status-good {
+            background: rgba(52, 211, 153, 0.2);
+            color: #6ee7b7;
+            border: 1px solid rgba(52, 211, 153, 0.4);
+            box-shadow: 0 0 20px rgba(52, 211, 153, 0.2);
+        }
+
+        .status-warning {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fcd34d;
+            border: 1px solid rgba(251, 191, 36, 0.4);
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.2);
+        }
+
+        .status-error {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+        }
+
+        .charts-section {
+            margin-top: 30px;
+        }
+
+        .chart-container {
+            height: 350px;
+            margin-bottom: 30px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .prb-charts {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .prb-chart-small {
+            height: 250px;
+        }
+
+        canvas {
+            max-height: 100%;
+        }
+
+        .last-update {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 0.9rem;
+            opacity: 0.8;
+            font-weight: 300;
+            color: rgba(255, 255, 255, 0.85);
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Infrastructure specific styles */
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-size: 0.95rem;
+            opacity: 0.8;
+            font-weight: 500;
+        }
+
+        .info-value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            font-family: 'Roboto Mono', monospace;
+            color: #a0c4ff;
+        }
+
+        .alarm-item {
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 4px solid;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+
+        .alarm-critical {
+            border-left-color: #f85149;
+        }
+
+        .alarm-major {
+            border-left-color: #d29922;
+        }
+
+        .alarm-minor {
+            border-left-color: #3fb950;
+        }
+
+        .alarm-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .alarm-item-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .alarm-item-time {
+            font-size: 0.8rem;
+            opacity: 0.7;
+        }
+
+        .alarm-item-cause {
+            font-size: 0.85rem;
+            opacity: 0.85;
+            margin-top: 4px;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .metrics-grid {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            }
+
+            .prb-charts {
+                grid-template-columns: 1fr;
+            }
+
+            .tab-button {
+                padding: 12px 20px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="particles-canvas"></canvas>
+
+    <div class="container">
+        <div class="header">
+            <h1>SMO</h1>
+            <p></p>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tab-navigation">
+            <button class="tab-button active" onclick="switchTab('ran')">RAN Metrics</button>
+            <button class="tab-button" onclick="switchTab('infrastructure')">Infrastructure</button>
+        </div>
+
+        <!-- RAN Metrics Tab (Original Content) -->
+        <div id="ran-tab" class="tab-content active">
+            <div class="metrics-grid">
+                <div class="glass-card">
+                    <div class="card-title">Channel Quality (CQI)</div>
+                    <div class="card-value" id="cqi-value">--</div>
+                    <div class="card-unit">Signal Quality Index</div>
+                    <span class="card-status status-good">Excellent</span>
+                </div>
+
+                <div class="glass-card">
+                    <div class="card-title">Signal Strength (RSRP)</div>
+                    <div class="card-value" id="rsrp-value">--</div>
+                    <div class="card-unit">dBm</div>
+                    <span class="card-status status-good">Strong</span>
+                </div>
+
+                <div class="glass-card">
+                    <div class="card-title">Downlink Throughput</div>
+                    <div class="card-value" id="dl-value">--</div>
+                    <div class="card-unit">Mbps</div>
+                    <span class="card-status status-good">Active</span>
+                </div>
+
+                <div class="glass-card">
+                    <div class="card-title">Uplink Throughput</div>
+                    <div class="card-value" id="ul-value">--</div>
+                    <div class="card-unit">Mbps</div>
+                    <span class="card-status status-good">Active</span>
+                </div>
+            </div>
+
+            <div class="charts-section">
+                <div class="glass-card">
+                    <div class="card-title">Throughput (DL/UL)</div>
+                    <div class="chart-container">
+                        <canvas id="throughputChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="prb-charts">
+                    <div class="glass-card">
+                        <div class="card-title">Min PRB Allocation</div>
+                        <div class="chart-container prb-chart-small">
+                            <canvas id="minPrbChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="glass-card">
+                        <div class="card-title">Max PRB Allocation</div>
+                        <div class="chart-container prb-chart-small">
+                            <canvas id="maxPrbChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="glass-card">
+                        <div class="card-title">Dedicated PRB</div>
+                        <div class="chart-container prb-chart-small">
+                            <canvas id="dedicatedPrbChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card">
+                    <div class="card-title">Channel Quality Indicator (CQI)</div>
+                    <div class="chart-container">
+                        <canvas id="cqiChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="last-update">
+                Last updated: <span id="timestamp">--</span>
+            </div>
+        </div>
+
+        <!-- Infrastructure Tab (New Content) -->
+        <div id="infrastructure-tab" class="tab-content">
+            <div class="metrics-grid">
+                <div class="glass-card">
+                    <div class="card-title">CPU Usage</div>
+                    <div class="card-value" id="infra-cpu">--</div>
+                    <div class="card-unit">Percent</div>
+                    <span class="card-status status-good" id="infra-cpu-status">Normal</span>
+                </div>
+
+                <div class="glass-card">
+                    <div class="card-title">Memory Usage</div>
+                    <div class="card-value" id="infra-memory">--</div>
+                    <div class="card-unit">Percent</div>
+                    <span class="card-status status-good" id="infra-memory-status">Normal</span>
+                </div>
+
+                <div class="glass-card">
+                    <div class="card-title">Disk Usage</div>
+                    <div class="card-value" id="infra-disk">--</div>
+                    <div class="card-unit">Percent</div>
+                    <span class="card-status status-good" id="infra-disk-status">Normal</span>
+                </div>
+
+                <div class="glass-card">
+                    <div class="card-title">Total Resources</div>
+                    <div class="card-value" id="infra-resources">--</div>
+                    <div class="card-unit">Discovered</div>
+                    <span class="card-status status-good">Active</span>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <div class="card-title">O-Cloud Information</div>
+                <div class="info-row">
+                    <span class="info-label">O-Cloud ID</span>
+                    <span class="info-value" id="ocloud-id">--</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">O-Cloud Name</span>
+                    <span class="info-value" id="ocloud-name">--</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Resource Pools</span>
+                    <span class="info-value" id="ocloud-pools">--</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Active Alarms</span>
+                    <span class="info-value" id="ocloud-alarms">--</span>
+                </div>
+            </div>
+
+            <div class="glass-card" style="margin-top: 30px;">
+                <div class="card-title">gNB Infrastructure Status</div>
+                <div class="info-row">
+                    <span class="info-label">Discovery Status</span>
+                    <span class="card-status status-good" id="gnb-discovered">Checking...</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Operational State</span>
+                    <span class="info-value" id="gnb-state">--</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Process PID</span>
+                    <span class="info-value" id="gnb-pid">--</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Process CPU Usage</span>
+                    <span class="info-value" id="gnb-cpu">--</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Process Memory Usage</span>
+                    <span class="info-value" id="gnb-memory">--</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">E2 Node ID</span>
+                    <span class="info-value" id="gnb-e2-id" style="font-size: 0.9rem;">--</span>
+                </div>
+            </div>
+
+            <div class="glass-card" style="margin-top: 30px;">
+                <div class="card-title">Active Alarms</div>
+                <div class="info-row">
+                    <span class="info-label">Total Alarms</span>
+                    <span class="info-value" id="alarm-total">--</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Critical</span>
+                    <span class="card-status status-error" id="alarm-critical">0</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Major</span>
+                    <span class="card-status status-warning" id="alarm-major">0</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Minor</span>
+                    <span class="card-status status-good" id="alarm-minor">0</span>
+                </div>
+                <div id="alarm-list" style="margin-top: 15px;">
+                    <!-- Alarms will be populated here -->
+                </div>
+            </div>
+
+            <div class="last-update">
+                Last updated: <span id="timestamp-infra">--</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Subtle Particle Effect
+        const canvas = document.getElementById('particles-canvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 1.5 + 0.3;
+                this.speedX = Math.random() * 0.3 - 0.15;
+                this.speedY = Math.random() * 0.3 - 0.15;
+                this.opacity = Math.random() * 0.15 + 0.05;
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+
+                if (this.x > canvas.width) this.x = 0;
+                if (this.x < 0) this.x = canvas.width;
+                if (this.y > canvas.height) this.y = 0;
+                if (this.y < 0) this.y = canvas.height;
+            }
+
+            draw() {
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.opacity})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        const particles = [];
+        for (let i = 0; i < 50; i++) {
+            particles.push(new Particle());
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < 120) {
+                        ctx.strokeStyle = `rgba(255, 255, 255, ${0.03 * (1 - distance / 120)})`;
+                        ctx.lineWidth = 0.5;
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            requestAnimationFrame(animateParticles);
+        }
+
+        animateParticles();
+
+        // Tab Switching
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Remove active class from all buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+            
+            // Mark button as active
+            event.target.classList.add('active');
+        }
+
+        // RAN Metrics Dashboard Code (Original - UNCHANGED)
+        const API_URL = 'http://localhost:8080/api';
+
+        Chart.defaults.color = '#ffffff';
+        Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.15)';
+        Chart.defaults.font.family = "'Inter', sans-serif";
+
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#ffffff',
+                        font: {
+                            size: 13,
+                            weight: '500'
+                        },
+                        padding: 15
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.08)'
+                    },
+                    ticks: {
+                        color: '#ffffff'
+                    }
+                },
+                x: {
+                    grid: {
+                        color: 'rgba(255, 255, 255, 0.08)'
+                    },
+                    ticks: {
+                        color: '#ffffff'
+                    }
+                }
+            }
+        };
+
+        // Initialize charts
+        const throughputChart = new Chart(document.getElementById('throughputChart'), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Downlink',
+                        data: [],
+                        borderColor: '#60a5fa',
+                        backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'Uplink',
+                        data: [],
+                        borderColor: '#34d399',
+                        backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }
+                ]
+            },
+            options: chartOptions
+        });
+
+        const cqiChart = new Chart(document.getElementById('cqiChart'), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'CQI',
+                    data: [],
+                    borderColor: '#fbbf24',
+                    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: chartOptions
+        });
+
+        const minPrbChart = new Chart(document.getElementById('minPrbChart'), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Min PRB %',
+                    data: [],
+                    borderColor: '#60a5fa',
+                    backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: chartOptions
+        });
+
+        const maxPrbChart = new Chart(document.getElementById('maxPrbChart'), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Max PRB %',
+                    data: [],
+                    borderColor: '#34d399',
+                    backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: chartOptions
+        });
+
+        const dedicatedPrbChart = new Chart(document.getElementById('dedicatedPrbChart'), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Dedicated PRB %',
+                    data: [],
+                    borderColor: '#fbbf24',
+                    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: chartOptions
+        });
+
+        // Fetch and update RAN metrics
+        async function updateMetrics() {
+            try {
+                const response = await fetch(`${API_URL}/summary`);
+                const data = await response.json();
+
+                document.getElementById('cqi-value').textContent = data.cqi.toFixed(1);
+                document.getElementById('rsrp-value').textContent = data.rsrp.toFixed(1);
+                document.getElementById('dl-value').textContent = (data.dl_throughput / 1000).toFixed(2);
+                document.getElementById('ul-value').textContent = (data.ul_throughput / 1000).toFixed(2);
+
+                document.getElementById('timestamp').textContent = new Date().toLocaleTimeString();
+            } catch (error) {
+                console.error('Error fetching metrics:', error);
+            }
+        }
+
+        async function updateCharts() {
+            try {
+                // Throughput
+                const throughputResponse = await fetch(`${API_URL}/throughput`);
+                const throughputData = await throughputResponse.json();
+
+                throughputChart.data.labels = throughputData.dl.map(d => new Date(d.time).toLocaleTimeString());
+                throughputChart.data.datasets[0].data = throughputData.dl.map(d => d.value / 1000);
+                throughputChart.data.datasets[1].data = throughputData.ul.map(d => d.value / 1000);
+                throughputChart.update('none');
+
+                // CQI
+                const cqiResponse = await fetch(`${API_URL}/cqi`);
+                const cqiData = await cqiResponse.json();
+
+                cqiChart.data.labels = cqiData.map(d => new Date(d.time).toLocaleTimeString());
+                cqiChart.data.datasets[0].data = cqiData.map(d => d.value);
+                cqiChart.update('none');
+
+                // PRB
+                const prbResponse = await fetch(`${API_URL}/prb`);
+                const prbData = await prbResponse.json();
+
+                minPrbChart.data.labels = prbData.min.map(d => new Date(d.time).toLocaleTimeString());
+                minPrbChart.data.datasets[0].data = prbData.min.map(d => d.value);
+                minPrbChart.update('none');
+
+                maxPrbChart.data.labels = prbData.max.map(d => new Date(d.time).toLocaleTimeString());
+                maxPrbChart.data.datasets[0].data = prbData.max.map(d => d.value);
+                maxPrbChart.update('none');
+
+                dedicatedPrbChart.data.labels = prbData.dedicated.map(d => new Date(d.time).toLocaleTimeString());
+                dedicatedPrbChart.data.datasets[0].data = prbData.dedicated.map(d => d.value);
+                dedicatedPrbChart.update('none');
+
+            } catch (error) {
+                console.error('Error updating charts:', error);
+            }
+        }
+
+        // Infrastructure Tab Functions (NEW)
+        const OCLOUD_URL = 'http://localhost:5000';
+
+        async function updateInfrastructure() {
+            try {
+                // Get O-CLOUD status
+                const statusResponse = await fetch(`${OCLOUD_URL}/status`);
+                const statusData = await statusResponse.json();
+
+                // System metrics
+                const metrics = statusData.systemMetrics;
+                document.getElementById('infra-cpu').textContent = metrics.cpuUsage.toFixed(1) + '%';
+                document.getElementById('infra-memory').textContent = metrics.memoryUsage.toFixed(1) + '%';
+                document.getElementById('infra-disk').textContent = metrics.diskUsage.toFixed(1) + '%';
+
+                // Update status indicators
+                updateStatusBadge('infra-cpu-status', metrics.cpuUsage);
+                updateStatusBadge('infra-memory-status', metrics.memoryUsage);
+                updateStatusBadge('infra-disk-status', metrics.diskUsage);
+
+                // O-CLOUD info
+                document.getElementById('ocloud-id').textContent = statusData.oCloud.ocloud_id;
+                document.getElementById('ocloud-name').textContent = statusData.oCloud.name;
+                document.getElementById('ocloud-pools').textContent = statusData.infrastructure.resourcePools;
+                document.getElementById('ocloud-alarms').textContent = statusData.infrastructure.activeAlarms;
+                document.getElementById('infra-resources').textContent = statusData.infrastructure.totalResources;
+
+                // Get resources to find gNB
+                const resourcesResponse = await fetch(`${OCLOUD_URL}/O2ims_infrastructureInventory/v1/resources`);
+                const resources = await resourcesResponse.json();
+
+                // Find gNB resource
+                const gnbResource = resources.find(r => r.resource_type_id === 'type-ran-gnb');
+
+                if (gnbResource) {
+                    document.getElementById('gnb-discovered').textContent = 'Discovered';
+                    document.getElementById('gnb-discovered').className = 'card-status status-good';
+                    document.getElementById('gnb-state').textContent = gnbResource.operational_state;
+                    
+                    if (gnbResource.extensions && gnbResource.extensions.process) {
+                        document.getElementById('gnb-pid').textContent = gnbResource.extensions.process.pid || '--';
+                    }
+                    
+                    if (gnbResource.extensions && gnbResource.extensions.resources) {
+                        document.getElementById('gnb-cpu').textContent = gnbResource.extensions.resources.cpu_percent ? 
+                            gnbResource.extensions.resources.cpu_percent.toFixed(1) + '%' : '--';
+                        document.getElementById('gnb-memory').textContent = gnbResource.extensions.resources.memory_percent ? 
+                            gnbResource.extensions.resources.memory_percent.toFixed(1) + '%' : '--';
+                    }
+                    
+                    if (gnbResource.extensions && gnbResource.extensions.ran_function) {
+                        document.getElementById('gnb-e2-id').textContent = gnbResource.extensions.ran_function.e2_node_id || '--';
+                    }
+                } else {
+                    document.getElementById('gnb-discovered').textContent = 'Not Found';
+                    document.getElementById('gnb-discovered').className = 'card-status status-error';
+                    document.getElementById('gnb-state').textContent = '--';
+                    document.getElementById('gnb-pid').textContent = '--';
+                    document.getElementById('gnb-cpu').textContent = '--';
+                    document.getElementById('gnb-memory').textContent = '--';
+                    document.getElementById('gnb-e2-id').textContent = '--';
+                }
+
+                document.getElementById('timestamp-infra').textContent = new Date().toLocaleTimeString();
+
+            } catch (error) {
+                console.error('Error fetching infrastructure data:', error);
+            }
+
+            // Fetch alarms
+            try {
+                const alarmsResponse = await fetch(`${OCLOUD_URL}/O2dms_infrastructureMonitoring/v1/alarms`);
+                const alarms = await alarmsResponse.json();
+
+                // Count by severity
+                let critical = 0, major = 0, minor = 0;
+                alarms.forEach(alarm => {
+                    if (!alarm.alarm_cleared) {
+                        const severity = alarm.perceived_severity.toUpperCase();
+                        if (severity === 'CRITICAL') critical++;
+                        else if (severity === 'MAJOR') major++;
+                        else if (severity === 'MINOR' || severity === 'WARNING') minor++;
+                    }
+                });
+
+                document.getElementById('alarm-total').textContent = critical + major + minor;
+                document.getElementById('alarm-critical').textContent = critical;
+                document.getElementById('alarm-major').textContent = major;
+                document.getElementById('alarm-minor').textContent = minor;
+
+                // Display alarm list (show last 5 active alarms)
+                const alarmList = document.getElementById('alarm-list');
+                const activeAlarms = alarms.filter(a => !a.alarm_cleared).slice(0, 5);
+
+                if (activeAlarms.length === 0) {
+                    alarmList.innerHTML = '<div style="text-align: center; opacity: 0.6; padding: 20px;">No active alarms</div>';
+                } else {
+                    alarmList.innerHTML = activeAlarms.map(alarm => {
+                        const severity = alarm.perceived_severity.toLowerCase();
+                        const time = new Date(alarm.alarm_raised_time).toLocaleString();
+                        return `
+                            <div class="alarm-item alarm-${severity}">
+                                <div class="alarm-item-header">
+                                    <span class="alarm-item-title">${alarm.alarm_type}</span>
+                                    <span class="card-status status-${severity === 'critical' ? 'error' : severity === 'major' ? 'warning' : 'good'}">${alarm.perceived_severity}</span>
+                                </div>
+                                <div class="alarm-item-cause">${alarm.probable_cause}</div>
+                                <div class="alarm-item-time">${time}</div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+            } catch (error) {
+                console.error('Error fetching alarms:', error);
+            }
+        }
+
+        function updateStatusBadge(elementId, value) {
+            const element = document.getElementById(elementId);
+            if (value < 70) {
+                element.textContent = 'Normal';
+                element.className = 'card-status status-good';
+            } else if (value < 85) {
+                element.textContent = 'Warning';
+                element.className = 'card-status status-warning';
+            } else {
+                element.textContent = 'Critical';
+                element.className = 'card-status status-error';
+            }
+        }
+
+        // Initial load
+        updateMetrics();
+        updateCharts();
+        updateInfrastructure();
+
+        // Update intervals
+        setInterval(updateMetrics, 2000);
+        setInterval(updateCharts, 5000);
+        setInterval(updateInfrastructure, 5000);
+    </script>
+</body>
+</html>
